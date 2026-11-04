@@ -1,0 +1,5 @@
+- insert:
+    - id: mood-chart
+      name: dsh-mood-chart
+      config:
+        title: 心情星轨

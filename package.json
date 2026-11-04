@@ -1,0 +1,38 @@
+{
+  "name": "dsh-mood-chart",
+  "version": "0.1.0",
+  "description": "3D mood star-track chart for DeepSeek Harness: a perspective curve (X time / Y valence / Z arousal) with free orbit, zoom, a 9-level legend and a manual mood slider. Renders the state owned by dsh-mood.",
+  "author": "Derpyu520 & 大肥鱼",
+  "license": "MIT",
+  "type": "module",
+  "main": "./lib/index.js",
+  "exports": {
+    ".": "./lib/index.js",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "lib",
+    "public",
+    "cordis.patch.yml",
+    "README.md",
+    "install.mjs",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "keywords": [
+    "dsh",
+    "dsh-plugin",
+    "deepseek-harness",
+    "mood",
+    "chart",
+    "3d",
+    "visualization"
+  ],
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    }
+  }
+}

@@ -1,0 +1,737 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>心情星轨 · dsh-mood-chart</title>
+<style>
+  :root {
+    --bg: #05070f;
+    --panel: rgba(12, 18, 34, .72);
+    --line: rgba(120, 160, 255, .16);
+    --text: #dbe6ff;
+    --dim: #7f8dab;
+    --green: #6ee7a8;
+    --amber: #f6c177;
+    --pink: #ff9ed2;
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; }
+  body {
+    background: radial-gradient(120% 90% at 50% 8%, #101a33 0%, #080d1b 45%, var(--bg) 100%);
+    color: var(--text);
+    font: 16.5px/1.65 "Microsoft YaHei", system-ui, sans-serif;
+    overflow: hidden;
+  }
+  #stars { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
+  .wrap {
+    position: relative; z-index: 2;
+    height: 100%; max-width: 1560px; margin: 0 auto;
+    display: flex; flex-direction: column;
+    padding: 14px 20px 10px;
+    gap: 10px;
+  }
+  header { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+  h1 { margin: 0; font-size: 23px; letter-spacing: .14em; color: #cfe0ff; font-weight: 600; }
+  .sub { color: var(--dim); font-size: 14px; }
+  .chip {
+    margin-left: auto; display: inline-flex; align-items: center; gap: 8px;
+    background: rgba(255, 158, 210, .12); border: 1px solid rgba(255, 158, 210, .35);
+    color: #ffd6ea; border-radius: 999px; padding: 4px 14px; font-size: 14.5px;
+  }
+  .chip b { color: #fff; font-weight: 600; }
+  .tabs { display: flex; gap: 8px; flex-wrap: wrap; }
+  .tab {
+    background: rgba(120, 160, 255, .08); border: 1px solid var(--line); color: #b9caf0;
+    border-radius: 8px; padding: 6px 14px; font-size: 14.5px; cursor: pointer;
+  }
+  .tab.on { background: rgba(110, 231, 168, .16); border-color: rgba(110, 231, 168, .5); color: #b9ffe0; }
+  .main {
+    flex: 1; min-height: 0;
+    display: grid; grid-template-columns: minmax(0, 1fr) 322px;
+    gap: 12px;
+  }
+  @media (max-width: 1080px) {
+    .main { grid-template-columns: minmax(0, 1fr) 268px; }
+  }
+  .card {
+    background: var(--panel); border: 1px solid var(--line); border-radius: 14px;
+    backdrop-filter: blur(8px); padding: 12px 14px; min-height: 0;
+  }
+  .chart-card { display: flex; flex-direction: column; min-height: 0; padding: 12px 16px 8px; }
+  .chart-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 6px; }
+  .chart-head .legend { color: var(--dim); font-size: 14px; }
+  .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 5px; vertical-align: 1px; }
+  .ranges { margin-left: auto; display: flex; gap: 6px; }
+  .ranges button {
+    background: rgba(255, 255, 255, .04); border: 1px solid var(--line); color: #a9bce0;
+    border-radius: 7px; padding: 3px 11px; font-size: 14px; cursor: pointer;
+  }
+  .ranges button.on { background: rgba(140, 180, 255, .18); color: #e6eeff; border-color: rgba(140, 180, 255, .45); }
+  #chart { flex: 1; width: 100%; min-height: 0; display: block; }
+  #tip {
+    position: fixed; pointer-events: none; z-index: 9; display: none;
+    background: rgba(6, 10, 20, .92); border: 1px solid rgba(120, 160, 255, .28);
+    border-radius: 8px; padding: 5px 9px; font-size: 12px; color: #dbe6ff; white-space: nowrap;
+  }
+  .side { display: flex; flex-direction: column; gap: 12px; min-height: 0; height: 100%; }
+  .side .card { display: flex; flex-direction: column; min-height: 0; padding: 10px 12px; }
+  .side .card.gauge-card { flex: 0 0 auto; }
+  .side .card.legend-card { flex: 1 1 auto; display: flex; flex-direction: column; min-height: 0; }
+  .rec-head { font-size: 13px; color: var(--dim); letter-spacing: .12em; margin: 8px 0 2px; }
+  #recent { font-size: 14px; color: #a9b7d2; max-height: 76px; overflow-y: auto; line-height: 1.5; }
+  #recent .ritem { display: flex; gap: 8px; }
+  #recent .ritem span:first-child { color: #7d8ba6; }
+  #legend { overflow-y: auto; min-height: 0; flex: 1 1 auto; padding: 0 4px 10px 0; }
+  #legend .lrow { padding: 7px 8px; font-size: 14px; }
+  #legend .lrow b { font-size: 14.5px; }
+  #legend .lrow .r { font-size: 13px; }
+  .lgroup { font-size: 12.5px; margin: 10px 0 3px; }
+  .barticks { position: relative; height: 16px; margin: 2px 0 6px; }
+  .barticks span { position: absolute; transform: translateX(-50%); font-size: 11.5px; color: #6f7d99; }
+  .barticks span::before { content: ''; position: absolute; left: 50%; top: -6px; width: 1px; height: 4px; background: rgba(160,180,220,.35); }
+  #recent { max-height: 96px; }
+  #legend::-webkit-scrollbar, #recent::-webkit-scrollbar { width: 6px; }
+  #legend::-webkit-scrollbar-thumb, #recent::-webkit-scrollbar-thumb { background: rgba(120,160,255,.22); border-radius: 3px; }
+  .gauge-title { font-size: 13.5px; color: var(--dim); letter-spacing: .13em; }
+  #gauge { width: 100%; aspect-ratio: 1 / 0.9; display: block; }
+  .kv { display: flex; gap: 10px; flex-wrap: wrap; color: var(--dim); font-size: 14px; }
+  .kv b { color: #e6eeff; font-weight: 600; }
+  .empty { color: var(--dim); font-size: 14px; padding: 10px 2px; }
+  #legend { font-size: 12px; }
+  .lgroup { font-size: 11.5px; color: #6f7d99; letter-spacing: .06em; margin: 7px 0 2px; padding-left: 2px; }
+  .lhint { font-size: 11.5px; color: #6f7d99; margin: 2px 0 6px; line-height: 1.35; }
+  #legend .lrow {
+    display: grid; grid-template-columns: 78px 1fr; gap: 6px; align-items: baseline;
+    padding: 3.5px 6px; border-radius: 6px; color: #aebad2; line-height: 1.2; font-size: 13.5px;
+    white-space: nowrap;
+  }
+  #legend .lrow.on { background: rgba(140, 180, 255, .14); color: #eaf1ff; }
+  #legend .lrow b { color: #e6eeff; font-weight: 600; white-space: nowrap; }
+  #legend .lrow .r { color: #7d8aa5; font-size: 13px; overflow: hidden; text-overflow: ellipsis; }
+  .bar { position: relative; height: 8px; border-radius: 999px; margin: 8px 0 4px;
+    background: linear-gradient(90deg, #ff8fb8 0%, #ffb59a 26%, #9fd8d0 50%, #7ee0a8 74%, #6fe3ff 100%); }
+  .bar i { position: absolute; top: -3px; width: 3px; height: 14px; border-radius: 2px;
+    background: #fff; box-shadow: 0 0 8px rgba(255,255,255,.85); }
+  .barlab { display: flex; justify-content: space-between; color: #6f7d99; font-size: 13px; }
+  footer { color: #55627d; font-size: 13px; display: flex; gap: 12px; flex-wrap: wrap; }
+  footer a { color: #7fa9ff; text-decoration: none; }
+
+  .slider-card { flex: 0 0 auto; }
+  .slider-card #vslide {
+    -webkit-appearance: none; appearance: none; width: 100%; height: 6px; border-radius: 999px;
+    background: linear-gradient(90deg, #ff8fb8 0%, #ffb59a 26%, #9fd8d0 50%, #7ee0a8 74%, #6fe3ff 100%);
+    outline: none; margin: 10px 0 2px; cursor: pointer;
+  }
+  .slider-card #vslide::-webkit-slider-thumb {
+    -webkit-appearance: none; width: 14px; height: 14px; border-radius: 50%;
+    background: #fff; border: 2px solid rgba(110,231,168,.9); box-shadow: 0 0 8px rgba(140,255,200,.7); cursor: grab;
+  }
+  .slidetticks { position: relative; height: 16px; margin-bottom: 4px; }
+  .slidetticks span { position: absolute; transform: translateX(-50%); font-size: 11.5px; color: #6f7d99; }
+  .slidetticks span::before { content: ''; position: absolute; left: 50%; top: -7px; width: 1px; height: 4px; background: rgba(160,180,220,.4); }
+  .slideerr { font-size: 12px; color: #ff9e9e; background: rgba(255,110,110,.1); border: 1px solid rgba(255,110,110,.35); border-radius: 8px; padding: 5px 8px; margin-bottom: 6px; }
+  .slidenote { font-size: 11.5px; line-height: 1.45; color: #8a7f6b; background: rgba(246,193,119,.08); border: 1px solid rgba(246,193,119,.22); border-radius: 8px; padding: 6px 8px; }
+  /* 右栏放宽后（2026-11-03 用户要求：去掉象限、对照表拉大、渐变条加刻度）——放在最后以覆盖前面的规则 */
+  .side .card.legend-card { padding: 12px 14px; }
+  #legend { flex: 1 1 auto; padding: 0 6px 12px 0; }
+  #legend .lrow { padding: 8px 9px; font-size: 14px; border-radius: 8px; }
+  #legend .lrow b { font-size: 14.5px; }
+  #legend .lrow .r { font-size: 13px; }
+  #legend .lrow.on { background: rgba(110,231,168,.12); }
+  .lgroup { font-size: 12.5px; color: #7d8ba6; letter-spacing: .05em; margin: 12px 0 4px; padding-left: 2px; }
+  .barticks { height: 16px; }
+  .barticks span { position: absolute; transform: translateX(-50%); font-size: 11.5px; color: #6f7d99; }
+  .barticks span::before { content: ''; position: absolute; left: 50%; top: -6px; width: 1px; height: 4px; background: rgba(160,180,220,.35); }
+  #recent { max-height: 110px; }
+
+  /* 数值对照表紧凑化 + 减轻粗体（2026-11-04 用户要求） */
+  #legend .lrow { padding: 4px 7px; line-height: 1.15; font-size: 13.5px; }
+  #legend .lrow b { font-weight: 500; font-size: 14px; color: #dde8ff; }
+  #legend .lrow .r { font-size: 12.5px; }
+  .lgroup { font-size: 12px; margin: 7px 0 2px; letter-spacing: .04em; }
+  .lhint { margin: 1px 0 5px; }
+</style>
+</head>
+<body>
+<canvas id="stars"></canvas>
+<div class="wrap">
+  <header>
+    <h1>心情星轨</h1>
+    <span class="sub" id="who">心情星轨</span>
+    <span class="chip" id="nowChip">读取中…</span>
+  </header>
+
+  <div class="tabs" id="tabs"></div>
+
+  <div class="main">
+    <section class="card chart-card">
+      <div class="chart-head">
+        <span class="legend"><i class="dot" style="background:var(--green)"></i>Y 轴 · 效价 v（-1 委屈 … +1 开心）</span>
+        <span class="legend"><i class="dot" style="background:var(--amber)"></i>Z 轴 · 唤醒度 a（0 懒洋洋 … 1 激动）</span>
+        <div class="ranges" id="viewbtns" style="margin-left:8px">
+          <button data-v="spin">自转</button>
+          <button data-v="home">重置视角</button>
+        </div>
+        <div class="ranges" id="ranges">
+          <button data-r="3600000">1 小时</button>
+          <button data-r="21600000" class="on">6 小时</button>
+          <button data-r="86400000">24 小时</button>
+          <button data-r="0">全部</button>
+        </div>
+      </div>
+      <canvas id="chart"></canvas>
+      <div id="emptyHint" class="empty" style="display:none">还没有心情采样点 —— 她在 QQ 里被夸、被凶，或者自己调心情，这里就会长出一条线。</div>
+    </section>
+
+    <aside class="side">
+      <section class="card legend-card">
+        <div class="gauge-title">数值对照 <span style="color:#8fe3b6">此刻 v <b id="kvV">—</b> · a <b id="kvA">—</b> · <b id="kvLabel">—</b></span></div>
+        <div class="lhint">v 决定大方向；中间那一小段（−0.10~0.15）由 a 细分三个标签</div>
+        <div class="bar"><i id="barDot"></i></div>
+        <div class="barticks" id="barTicks"></div>
+        <div id="legend"></div>
+        <div class="rec-head">最近变化</div>
+        <div id="recent">—</div>
+      </section>
+
+      <section class="card slider-card">
+        <div class="gauge-title">心情滑杆 <span id="slideReadout" style="color:#9fe8c0">v 0 · 平静</span></div>
+        <input id="vslide" type="range" min="-1" max="1" step="0.01" value="0" />
+        <div class="slidetticks" id="slideTicks"></div>
+        <div class="slideerr" id="slideErr" style="display:none"></div>
+        <div class="slidenote">⚠️ 谨慎使用：这条会**直接改写她此刻的心情**（并记一个采样点），之后仍按 6 小时半衰期慢慢淡回去。想试手感可以，别一直拨。松手后 8 秒内滑杆不会被自动刷新拽回去；写入的值有 <b>6 小时保持期</b>，这期间不衰减，到期后才开始按半衰期淡回基线。</div>
+      </section>
+    </aside>
+  </div>
+
+  <footer>
+    <span id="footNote">每 5 秒自动刷新</span>
+    <span>·</span>
+    <a href="/mood-chart" target="_blank">心情内核（dsh-mood）</a>
+    <span>·</span>
+    <span>数据来自 <code>GET /api/mood/history</code></span>
+  </footer>
+</div>
+<div id="tip"></div>
+
+<script>
+/* ── 星空背景（和记忆银河一个调子）─────────────────────────────── */
+(function starfield() {
+  const cv = document.getElementById('stars');
+  const ctx = cv.getContext('2d');
+  let W = 0, H = 0, stars = [], t = 0;
+  function resize() {
+    W = cv.width = innerWidth * devicePixelRatio;
+    H = cv.height = innerHeight * devicePixelRatio;
+    cv.style.width = innerWidth + 'px';
+    cv.style.height = innerHeight + 'px';
+    stars = Array.from({ length: 320 }, () => ({
+      x: Math.random() * W, y: Math.random() * H,
+      r: (0.4 + Math.random() * 1.3) * devicePixelRatio,
+      a: 0.15 + Math.random() * 0.55,
+      s: 0.2 + Math.random() * 0.7,
+    }));
+  }
+  function frame() {
+    t += 0.006;
+    ctx.clearRect(0, 0, W, H);
+    // 淡淡的两团星云
+    for (const [cx, cy, rad, col] of [
+      [W * 0.3, H * 0.35, W * 0.42, '120,160,255'],
+      [W * 0.75, H * 0.7, W * 0.36, '255,150,210'],
+    ]) {
+      const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, rad);
+      g.addColorStop(0, `rgba(${col},.06)`);
+      g.addColorStop(1, `rgba(${col},0)`);
+      ctx.fillStyle = g;
+      ctx.fillRect(0, 0, W, H);
+    }
+    for (const s of stars) {
+      const tw = 0.6 + 0.4 * Math.sin(t * s.s * 3 + s.x * 0.01);
+      ctx.globalAlpha = s.a * tw;
+      ctx.fillStyle = '#dce8ff';
+      ctx.beginPath(); ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2); ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+    requestAnimationFrame(frame);
+  }
+  addEventListener('resize', resize);
+  resize(); frame();
+})();
+
+/* ── 数据与图表 ─────────────────────────────────────────────── */
+const el = (id) => document.getElementById(id);
+let all = null;         // { moods, config }
+let activeKey = null;
+let rangeMs = 6 * 3600 * 1000;
+let hoverX = null;
+
+const COLORS = { v: '#6ee7a8', a: '#f6c177' };
+
+function labelOf(key) {
+  if (key === 'private:2163268087') return '私聊 · 主人';
+  if (key === 'group:654578824') return '群 · 永恒维度';
+  if (key === 'group:1129594461') return '群 · 1129594461';
+  return key;
+}
+
+async function load() {
+  try {
+    const r = await fetch('/mood-chart/api/state', { cache: 'no-store' });
+    const j = await r.json();
+    if (!j.ok) throw new Error(j.error || '读取失败');
+    all = j;
+    const keys = Object.keys(j.moods || {});
+    if (!keys.length) { renderTabs([]); return; }
+    if (!activeKey || !j.moods[activeKey]) {
+      const best = keys
+        .map((k) => ({ k, n: (j.moods[k].samples || []).length, priv: k.startsWith('private') ? 1 : 0 }))
+        .sort((a, b) => (b.n - a.n) || (b.priv - a.priv))[0];
+      activeKey = best ? best.k : keys[0];
+    }
+    renderTabs(keys);
+    renderAll();
+    el('footNote').textContent = '每 5 秒自动刷新 · 上次 ' + new Date().toLocaleTimeString('zh-CN');
+  } catch (e) {
+    el('nowChip').textContent = '读不到心情数据：' + (e.message || e);
+  }
+}
+
+function renderTabs(keys) {
+  const box = el('tabs');
+  box.innerHTML = '';
+  for (const k of keys) {
+    const b = document.createElement('button');
+    b.className = 'tab' + (k === activeKey ? ' on' : '');
+    b.textContent = labelOf(k);
+    b.onclick = () => { activeKey = k; renderTabs(keys); renderAll(); };
+    box.appendChild(b);
+  }
+}
+
+function visibleSamples() {
+  const m = all && all.moods[activeKey];
+  const pts = m && Array.isArray(m.samples) ? m.samples : [];
+  const cut = !rangeMs ? 0 : Date.now() - rangeMs;
+  const out = cut ? pts.filter((p) => p.t >= cut) : pts.slice();
+  // 一条历史都没有时，用「此刻」造一个点，好让人确认窗口是活的
+  if (!out.length) {
+    const cur = (m && m.current) || { v: 0, a: 0.25 };
+    return [{ t: Date.now(), v: cur.v, a: cur.a, now: true }];
+  }
+  return out;
+}
+
+// 分三组展示（2026-11-03 按用户反馈重排）：
+  //   · 正向 v：越往上越开心，按 v 从大到小；
+  //   · 中性带：v 落在 −0.10~0.15 这一小段，v 不再决定标签，改由唤醒度 a 细分；
+  //   · 负向 v：从"有点不爽"到"很委屈"，越往下越难受。
+  const MOOD_GROUPS = [
+    {
+      title: '正向 · v ≥ 0.15',
+      rows: [
+        ['很兴奋', 'v ≥ 0.60 且 a ≥ 0.55', '连着被夸、被表白、被哄'],
+        ['开心', 'v ≥ 0.45', '聊得顺、被夸了一句'],
+        ['还不错', 'v ≥ 0.15', '有点小开心'],
+      ],
+    },
+    {
+      title: '中性带 · −0.10 < v < 0.15（v 说了不算，按劲儿排：静 → 懒 → 躁）',
+      rows: [
+        ['平静', '0.15 < a < 0.70（兜底）', '日常（基线 v 0 / a 0.25）'],
+        ['懒洋洋', 'a ≤ 0.15', '刚睡醒、半夜、没精神'],
+        ['有点躁', 'a ≥ 0.70', '被催、被刷屏、事情很赶'],
+      ],
+    },
+    {
+      title: '负向 · v ≤ −0.10',
+      rows: [
+        ['有点不爽', 'v ≤ −0.10', '被敷衍、被无视一句'],
+        ['有点低落', 'v ≤ −0.30', '被冷落、被说重话'],
+        ['很委屈', 'v ≤ −0.60', '被凶、被批评、被冤枉'],
+      ],
+    },
+  ];
+
+const SLIDE_URL = '/mood-chart/api/set';
+  // 用户手动拨过之后，这段时间内不用服务端值覆盖滑杆（否则每 5 秒刷新会被"拽回去"）
+  let sliderHoldUntil = 0;
+
+/** 与 lib/mood.js 的 moodLabel() 同序：v 先判、a 后判、平静兜底 */
+function moodLabelOf(v, a) {
+  const V = Number(v) || 0, A = Number(a) || 0;
+  if (V >= 0.6 && A >= 0.55) return '很兴奋';
+  if (V >= 0.45) return '开心';
+  if (V >= 0.15) return '还不错';
+  if (V <= -0.6) return '很委屈';
+  if (V <= -0.3) return '有点低落';
+  if (V <= -0.1) return '有点不爽';
+  if (A >= 0.7) return '有点躁';
+  if (A <= 0.15) return '懒洋洋';
+  return '平静';
+}
+
+function renderSlideTicks() {
+  const box = el('slideTicks');
+  if (!box) return;
+  box.innerHTML = [-1, -0.5, 0, 0.5, 1].map((v) => {
+    const pct = ((v + 1) / 2) * 100;
+    const t = v > 0 ? '+' + v : String(v);
+    return '<span style="left:' + pct + '%">' + t + '</span>';
+  }).join('');
+}
+
+function initSlider() {
+  const sl = el('vslide');
+  if (!sl || sl._bound) return;
+  sl._bound = true;
+  const paint = () => {
+    const v = Number(sl.value) || 0;
+    const a = Number(all && all.moods && all.moods[activeKey] && all.moods[activeKey].current && all.moods[activeKey].current.a) || 0.25;
+    const label = moodLabelOf(v, a);
+    el('slideReadout').textContent = 'v ' + v.toFixed(2) + ' · ' + label;
+    // 拖动时把游标也挪到同一位置，让"预览"和表格一致
+    const dot = el('barDot');
+    if (dot) dot.style.left = 'calc(' + (((v + 1) / 2) * 100).toFixed(1) + '% - 1.5px)';
+  };
+  sl._paint = paint;
+  sl.addEventListener('input', paint);
+  sl.addEventListener('change', async () => {
+    const v = Number(sl.value) || 0;
+    try {
+      const r = await fetch(SLIDE_URL, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ key: activeKey, v, holdHours: 6 }),
+      });
+      const j = await r.json().catch(() => ({}));
+      if (j && j.ok) {
+        sliderHoldUntil = Date.now() + 8000;
+        el('footNote').textContent = '已写入 v ' + j.v + ' · ' + j.label + '（8 秒内不会被刷新覆盖，之后按半衰期慢慢淡回）';
+        await load();
+      } else {
+        el('footNote').textContent = '写入失败：' + (j.error || ('HTTP ' + r.status));
+        const ee = el('slideErr'); if (ee) { ee.style.display = 'block'; ee.textContent = '写入失败：' + (j.error || ('HTTP ' + r.status)); }
+      }
+    } catch (e) {
+      el('footNote').textContent = '写入失败：' + (e.message || e);
+      const ee = el('slideErr'); if (ee) { ee.style.display = 'block'; ee.textContent = '写入失败：' + (e.message || e); }
+    }
+  });
+  paint();
+  renderSlideTicks();
+}
+
+function renderBarTicks() {
+  const box = el('barTicks');
+  if (!box) return;
+  const stops = [-1, -0.5, 0, 0.5, 1];
+  box.innerHTML = stops.map((v) => {
+    const pct = ((v + 1) / 2) * 100;
+    const label = v > 0 ? '+' + v : String(v);
+    return '<span style="left:' + pct + '%">' + label + '</span>';
+  }).join('');
+}
+
+function renderLegend(cur) {
+  const box = el('legend');
+  if (!box) return;
+  const v = Number(cur && cur.v) || 0;
+  const a = Number(cur && cur.a) || 0;
+  const nowLabel = moodLabelOf(v, a);
+  box.innerHTML = MOOD_GROUPS.map((g) => (
+    '<div class="lgroup">' + g.title + '</div>' +
+    g.rows.map(([name, rule, eg]) => {
+      const on = name === nowLabel ? ' on' : '';
+      return '<div class="lrow' + on + '"><b>' + name + '</b><span>' +
+        '<span class="r" title="例：' + eg + '">' + rule + '</span></span></div>';
+    }).join('')
+  )).join('');
+  const dot = el('barDot');
+  if (dot) dot.style.left = 'calc(' + (((Math.max(-1, Math.min(1, v)) + 1) / 2) * 100).toFixed(1) + '% - 1.5px)';
+}
+
+function renderAll() {
+  const m = all.moods[activeKey];
+  const cur = m.current || { v: 0, a: 0.25, label: '平静' };
+  el('nowChip').innerHTML = `此刻 <b>${m.label || cur.label}</b> · v ${cur.v} · a ${cur.a}`;
+  el('kvV').textContent = cur.v;
+  el('kvA').textContent = cur.a;
+  el('kvLabel').textContent = m.label || cur.label;
+  drawChart();
+  renderRecent(m);
+  renderLegend(cur);
+  renderBarTicks();
+  const sl = el('vslide');
+  if (sl) {
+    const server = Number(cur.v) || 0;
+    const near = Math.abs(Number(sl.value) - server) < 0.01;
+    if (Date.now() >= sliderHoldUntil && !near) {
+      sl.value = server;
+      if (typeof sl._paint === 'function') sl._paint();
+    }
+  }
+}
+
+function renderRecent(m) {
+  const pts = (m.samples || []).slice(-4).reverse();
+  const box = el('recent');
+  if (!pts.length) { box.textContent = '—'; return; }
+  box.innerHTML = pts.map((p) => {
+    const d = new Date(p.t);
+    const hm = String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
+    return '<div class="ritem"><span>' + hm + '</span><span>v ' + p.v + ' · a ' + p.a + '</span></div>';
+  }).join('');
+  return;
+  if (!pts.length) { box.textContent = '—'; return; }
+  box.innerHTML = pts.map((p) => {
+    const d = new Date(p.t);
+    const hm = `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+    const colored = p.v >= 0 ? COLORS.v : COLORS.pink;
+    return `<div style="display:flex;gap:8px;font-size:12px;color:#9fb0cf">
+      <span style="color:#5c6a86">${hm}</span>
+      <span style="color:${colored}">v ${p.v}</span>
+      <span style="color:${COLORS.a}">a ${p.a}</span>
+    </div>`;
+  }).join('');
+}
+
+/* 三维心情曲线：X = 时间，Y = 效价 v，Z = 唤醒度 a；只允许绕竖轴旋转 */
+const cam3 = { yaw: -0.62, zoom: 0.8, pitch: 0.52, spin: false, home: { yaw: -0.62, pitch: 0.52, zoom: 0.8 } };
+
+function project3(x, y, z, w, h, s) {
+  const cos = Math.cos(cam3.yaw), sin = Math.sin(cam3.yaw);
+  const xr = x * cos - z * sin;
+  const zr = x * sin + z * cos;
+  const sc = s * cam3.zoom;
+  return {
+    x: w / 2 + xr * sc,
+    y: h / 2 - (y * Math.cos(cam3.pitch) + zr * Math.sin(cam3.pitch)) * sc,
+    depth: zr,
+  };
+}
+
+function drawChart() {
+  const cv = el('chart');
+  const dpr = Math.min(2, devicePixelRatio || 1);
+  const w = cv.clientWidth, h = cv.clientHeight;
+  cv.width = w * dpr; cv.height = h * dpr;
+  const ctx = cv.getContext('2d');
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.clearRect(0, 0, w, h);
+  ctx.font = '13.5px "Microsoft YaHei", sans-serif';
+
+  const pts = visibleSamples();
+  const hint = el('emptyHint');
+  if (!pts.length) { hint.style.display = 'block'; return; }
+  hint.style.display = 'none';
+
+  const t0 = pts[0].t;
+  const t1 = Math.max(pts[pts.length - 1].t, Date.now());
+  const span = Math.max(60000, t1 - t0);
+  const S = Math.min(w, h) * 0.46;            // 基准缩放
+  const AX = 1.0;                              // X 半长
+  const AY = 1.0;                              // Y 半长
+  const AZ = 0.62;                             // Z 半长（a 0..1 映射到 -AZ..AZ）
+  const P = (x, y, z) => project3(x, y, z, w, h, S);
+  const zOf = (a) => (Number(a) - 0.5) * 2 * AZ;
+
+  // ── 地面网格（y = -1 平面） ──
+  ctx.strokeStyle = 'rgba(120,160,255,.10)';
+  ctx.lineWidth = 1;
+  for (let i = 0; i <= 4; i++) {
+    const x = -AX + (2 * AX) * (i / 4);
+    const a1 = P(x, -AY, -AZ), a2 = P(x, -AY, AZ);
+    ctx.beginPath(); ctx.moveTo(a1.x, a1.y); ctx.lineTo(a2.x, a2.y); ctx.stroke();
+  }
+  for (let i = 0; i <= 4; i++) {
+    const z = -AZ + (2 * AZ) * (i / 4);
+    const a1 = P(-AX, -AY, z), a2 = P(AX, -AY, z);
+    ctx.beginPath(); ctx.moveTo(a1.x, a1.y); ctx.lineTo(a2.x, a2.y); ctx.stroke();
+  }
+
+  // ── 三条轴 ──
+  const axis = (p1, p2, color, label, labelPos) => {
+    const A = P(...p1), B = P(...p2);
+    ctx.strokeStyle = color; ctx.lineWidth = 1.6;
+    ctx.beginPath(); ctx.moveTo(A.x, A.y); ctx.lineTo(B.x, B.y); ctx.stroke();
+    // 箭头
+    const ang = Math.atan2(B.y - A.y, B.x - A.x);
+    ctx.beginPath();
+    ctx.moveTo(B.x, B.y);
+    ctx.lineTo(B.x - 9 * Math.cos(ang - 0.4), B.y - 9 * Math.sin(ang - 0.4));
+    ctx.moveTo(B.x, B.y);
+    ctx.lineTo(B.x - 9 * Math.cos(ang + 0.4), B.y - 9 * Math.sin(ang + 0.4));
+    ctx.stroke();
+    if (label) {
+      const L = P(...labelPos);
+      ctx.fillStyle = color;
+      ctx.fillText(label, L.x, L.y);
+    }
+  };
+  const timeAxis = pts[pts.length - 1].t;
+  void timeAxis;
+  axis([-AX, -AY, -AZ], [AX, -AY, -AZ], 'rgba(120,160,255,.55)', '时间', [AX * 0.86, -AY, -AZ]);
+  axis([-AX, -AY, -AZ], [-AX, AY * 0.86, -AZ], 'rgba(110,231,168,.6)', 'v 效价', [-AX, AY * 0.92, -AZ]);
+  axis([-AX, -AY, -AZ], [-AX, -AY, AZ], 'rgba(246,193,119,.6)', 'a 唤醒度', [-AX, -AY, AZ * 1.12]);
+
+  // 轴刻度
+  ctx.fillStyle = '#5c6a86';
+  for (const v of [-1, -0.5, 0, 0.5, 1]) {
+    const q = P(-AX, v * AY, -AZ);
+    ctx.fillText(String(v), q.x - 22, q.y + 4);
+    const tickA = P(-AX - 0.03, v * AY, -AZ), tickB = P(-AX + 0.03, v * AY, -AZ);
+    ctx.strokeStyle = 'rgba(120,160,255,.3)'; ctx.beginPath();
+    ctx.moveTo(tickA.x, tickA.y); ctx.lineTo(tickB.x, tickB.y); ctx.stroke();
+  }
+  for (const a of [0, 0.5, 1]) {
+    const q = P(-AX, -AY, zOf(a));
+    ctx.fillText(String(a), q.x - 4, q.y + 18);
+  }
+
+  // ── 曲线 ──
+  const proj = pts.map((p) => {
+    const x = ((p.t - t0) / span) * 2 * AX - AX;
+    const y = Math.max(-1, Math.min(1, Number(p.v))) * AY;
+    const z = zOf(p.a);
+    const q = P(x, y, z);
+    const fq = P(x, -AY, z);
+    return { ...p, sx: q.x, sy: q.y, fx: fq.x, fy: fq.y, depth: q.depth };
+  });
+
+  // 投影到地面的虚线（帮助看出三维深度）
+  ctx.setLineDash([2, 4]);
+  ctx.strokeStyle = 'rgba(120,160,255,.12)';
+  ctx.lineWidth = 1;
+  for (const q of proj) {
+    ctx.beginPath(); ctx.moveTo(q.sx, q.sy); ctx.lineTo(q.fx, q.fy); ctx.stroke();
+  }
+  ctx.setLineDash([]);
+
+  // 主线（按 v 分色：正绿负粉）
+  for (let i = 1; i < proj.length; i++) {
+    const a = proj[i - 1], b = proj[i];
+    const pos = (a.v + b.v) / 2 >= 0;
+    ctx.strokeStyle = pos ? 'rgba(110,231,168,.85)' : 'rgba(255,158,210,.85)';
+    ctx.lineWidth = 2.4;
+    ctx.beginPath(); ctx.moveTo(a.sx, a.sy); ctx.lineTo(b.sx, b.sy); ctx.stroke();
+  }
+
+  // 点
+  for (const q of proj) {
+    const pos = Number(q.v) >= 0;
+    ctx.fillStyle = pos ? '#6ee7a8' : '#ff9ed2';
+    ctx.beginPath(); ctx.arc(q.sx, q.sy, q === proj[proj.length - 1] ? 5 : 3, 0, Math.PI * 2); ctx.fill();
+  }
+  const last = proj[proj.length - 1];
+  ctx.strokeStyle = 'rgba(234,255,244,.85)';
+  ctx.lineWidth = 1.4;
+  ctx.beginPath(); ctx.arc(last.sx, last.sy, 10, 0, Math.PI * 2); ctx.stroke();
+
+  // 时间轴两端
+  const fmt = (t) => {
+    const d = new Date(t);
+    return `${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+  };
+  const pA = P(-AX, -AY - 0.12, -AZ);
+  ctx.fillStyle = '#5c6a86';
+  ctx.fillText(fmt(t0), pA.x - 10, pA.y + 22);
+  const endTxt = fmt(t1);
+  const pB = P(AX, -AY - 0.12, -AZ);
+  ctx.fillText(endTxt, pB.x - ctx.measureText(endTxt).width, pB.y + 22);
+
+  cv._geom = { pts: proj };
+}
+
+
+/* 交互：左右拖 = 绕竖轴旋转，滚轮 = 缩放，悬停 = 看点位 */
+(function interact() {
+  const cv = el('chart');
+  const tip = el('tip');
+  let dragging = false, lastX = 0;
+
+  cv.addEventListener('pointerdown', (e) => {
+    dragging = true; lastX = e.clientX; lastY = e.clientY;
+    cv.setPointerCapture(e.pointerId); cv.style.cursor = 'grabbing';
+  });
+  let lastY = 0;
+  cv.addEventListener('pointermove', (e) => {
+    if (dragging) {
+      cam3.yaw += (e.clientX - lastX) * 0.012;
+      cam3.pitch = Math.max(-1.35, Math.min(1.45, cam3.pitch - (e.clientY - lastY) * 0.008));
+      lastX = e.clientX; lastY = e.clientY;
+      drawChart();
+      tip.style.display = 'none';
+      return;
+    }
+    const g = cv._geom;
+    if (!g) return;
+    const rect = cv.getBoundingClientRect();
+    const mx = e.clientX - rect.left, my = e.clientY - rect.top;
+    let best = null, bd = 1e9;
+    for (const p of g.pts) {
+      const d = Math.hypot(p.sx - mx, p.sy - my);
+      if (d < bd) { bd = d; best = p; }
+    }
+    if (!best || bd > 16) { tip.style.display = 'none'; return; }
+    const d = new Date(best.t);
+    const hm = `${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}:${String(d.getSeconds()).padStart(2, '0')}`;
+    tip.innerHTML = `<b>${hm}</b><br>v <span style="color:${COLORS.v}">${best.v}</span>　a <span style="color:${COLORS.a}">${best.a}</span>`;
+    tip.style.display = 'block';
+    tip.style.left = Math.min(innerWidth - 200, e.clientX + 14) + 'px';
+    tip.style.top = (e.clientY - 12) + 'px';
+  });
+  const endDrag = () => { dragging = false; cv.style.cursor = 'grab'; };
+  cv.addEventListener('pointerup', endDrag);
+  cv.addEventListener('pointercancel', endDrag);
+  cv.addEventListener('pointerleave', () => { tip.style.display = 'none'; endDrag(); });
+  cv.addEventListener('dblclick', () => {
+    cam3.yaw = cam3.home.yaw; cam3.pitch = cam3.home.pitch; cam3.zoom = cam3.home.zoom;
+    drawChart();
+  });
+  cv.addEventListener('wheel', (e) => {
+    e.preventDefault();
+    cam3.zoom = Math.max(0.55, Math.min(2.4, cam3.zoom * (e.deltaY > 0 ? 0.92 : 1.08)));
+    drawChart();
+  }, { passive: false });
+  cv.style.cursor = 'grab';
+
+  // 自转（转得比银河慢一点，方便看清曲线走向）
+  let spinning = false;
+  const tick = () => {
+    if (!spinning) return;
+    cam3.yaw += 0.0032;
+    drawChart();
+    requestAnimationFrame(tick);
+  };
+  el('viewbtns').addEventListener('click', (e) => {
+    const b = e.target.closest('button');
+    if (!b) return;
+    if (b.dataset.v === 'spin') {
+      cam3.spin = !cam3.spin;
+      b.classList.toggle('on', cam3.spin);
+      if (cam3.spin && !spinning) { spinning = true; requestAnimationFrame(tick); }
+      if (!cam3.spin) spinning = false;
+    } else if (b.dataset.v === 'home') {
+      cam3.yaw = cam3.home.yaw; cam3.pitch = cam3.home.pitch; cam3.zoom = cam3.home.zoom;
+      drawChart();
+    }
+  });
+})();
+
+el('ranges').addEventListener('click', (e) => {
+  const b = e.target.closest('button');
+  if (!b) return;
+  rangeMs = Number(b.dataset.r) || 0;
+  for (const x of el('ranges').children) x.classList.toggle('on', x === b);
+  drawChart();
+});
+
+addEventListener('resize', () => { if (all) renderAll(); });
+initSlider();
+load();
+setInterval(load, 5000);
+</script>
+</body>
+</html>
